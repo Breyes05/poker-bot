@@ -7,7 +7,14 @@ from abc import ABC, abstractmethod
 
 
 class Game(ABC):
-    """Two-player zero-sum extensive-form game."""
+    """Two-player zero-sum extensive-form game.
+
+    States must be hashable (e.g. frozen dataclasses) so evaluators can cache them.
+    """
+
+    #: Chips per big blind, used to report results in milli-big-blinds (mbb).
+    #: Ante-only games (Kuhn, Leduc) treat the 1-chip ante as the big blind.
+    big_blind: float = 1.0
 
     @abstractmethod
     def initial_state(self):

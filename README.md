@@ -25,9 +25,9 @@ results and playable in the browser. Each milestone ends with a "done when" chec
 - Reading: Neller & Lanctot section 3; Kuhn (1950)
 
 ### M2 — Exploitability (about a week)
-- [ ] `eval/exploitability.py`: best response against a fixed strategy, for each player
-- [ ] Report exploitability in mbb/hand
-- [ ] Log exploitability during training and plot it (`viz` extra)
+- [x] `eval/exploitability.py`: best response against a fixed strategy, for each player
+- [x] Report exploitability in mbb/hand
+- [x] Log exploitability during training and plot it (`viz` extra)
 - **Done when:** Kuhn exploitability falls toward 0 as iterations go up; a uniform random
   strategy gives a clearly positive value
 - Reading: Lanctot thesis (best-response chapter); Johanson et al. 2011
