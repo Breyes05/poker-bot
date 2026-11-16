@@ -8,18 +8,18 @@ Goal: a game-agnostic CFR engine for three poker variants, checked against known
 results and playable in the browser. Each milestone ends with a "done when" check.
 
 ### M0 — Warm-up: regret matching (an evening)
-- [ ] Rock-paper-scissors self-play with regret matching (`notebooks/` is fine)
-- [ ] Understand why the *average* strategy converges and the current one doesn't
+- [x] Rock-paper-scissors self-play with regret matching (`notebooks/` is fine)
+- [x] Understand why the *average* strategy converges and the current one doesn't
 - **Done when:** the average strategy converges to (1/3, 1/3, 1/3)
 - Reading: Neller & Lanctot, *An Introduction to CFR*, sections 1–2
 
 ### M1 — Kuhn poker + vanilla CFR (a weekend)
-- [ ] Finalize the `Game` interface in `games/base.py` (state, legal actions, current player,
+- [x] Finalize the `Game` interface in `games/base.py` (state, legal actions, current player,
       chance outcomes, info-set key, terminal utility)
-- [ ] `games/kuhn.py`
-- [ ] `solvers/cfr.py`: recursive CFR with regret + average-strategy tables
-- [ ] `scripts/train.py --game kuhn` saves the average strategy to `results/`
-- [ ] Tests: rule tests (legal actions, payoffs for every terminal history)
+- [x] `games/kuhn.py`
+- [x] `solvers/cfr.py`: recursive CFR with regret + average-strategy tables
+- [x] `scripts/train.py --game kuhn` saves the average strategy to `results/`
+- [x] Tests: rule tests (legal actions, payoffs for every terminal history)
 - **Done when:** the game value is within 1e-3 of −1/18 and the strategy lies in Kuhn's
   one-parameter equilibrium family (test it)
 - Reading: Neller & Lanctot section 3; Kuhn (1950)
