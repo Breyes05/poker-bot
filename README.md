@@ -33,10 +33,10 @@ results and playable in the browser. Each milestone ends with a "done when" chec
 - Reading: Lanctot thesis (best-response chapter); Johanson et al. 2011
 
 ### M3 — Leduc Hold'em + MCCFR (1–2 weeks)
-- [ ] `games/leduc.py`: 6-card deck, 2 betting rounds, public card, raise cap
-- [ ] Vanilla CFR runs on Leduc unchanged (proves the interface is game-agnostic)
-- [ ] `solvers/mccfr.py`: external-sampling MCCFR (outcome sampling optional)
-- [ ] Plot exploitability vs. wall-clock time: CFR vs. MCCFR
+- [x] `games/leduc.py`: 6-card deck, 2 betting rounds, public card, raise cap
+- [x] Vanilla CFR runs on Leduc unchanged (proves the interface is game-agnostic)
+- [x] `solvers/mccfr.py`: external-sampling MCCFR (outcome sampling optional)
+- [x] Plot exploitability vs. wall-clock time: CFR vs. MCCFR
 - **Done when:** your numbers line up with OpenSpiel's Leduc exploitability for similar
   iteration counts
 - Reading: Southey et al. 2005 (rules); Lanctot et al. 2009

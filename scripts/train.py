@@ -3,6 +3,7 @@
 Examples:
     uv run python scripts/train.py --game kuhn --iterations 10000
     uv run --extra viz python scripts/train.py --game kuhn --iterations 100000 --plot
+    uv run python scripts/train.py --game leduc --solver mccfr --iterations 1000000 --seed 0
 """
 
 import argparse
@@ -14,10 +15,20 @@ from pathlib import Path
 from pokerbot.eval.exploitability import exploitability, to_mbb
 from pokerbot.eval.value import expected_value
 from pokerbot.games.kuhn import KuhnPoker
+from pokerbot.games.leduc import LeducHoldem
 from pokerbot.solvers.cfr import CFRSolver
+from pokerbot.solvers.mccfr import MCCFRSolver
 
-GAMES = {"kuhn": KuhnPoker}
-SOLVERS = {"cfr": CFRSolver}
+GAMES = {"kuhn": KuhnPoker, "leduc": LeducHoldem}
+SOLVERS = {
+    "cfr": lambda game, seed: CFRSolver(game),
+    "mccfr": lambda game, seed: MCCFRSolver(game, seed=seed),
+}
+ACTION_LEGEND = {
+    "kuhn": "info set = own card | history; p = check/fold, b = bet/call",
+    "leduc": "info set = own card + board | round 1 / round 2; f = fold, c = check/call, "
+    "r = bet/raise",
+}
 
 
 def checkpoints(iterations: int, points: int) -> list[int]:
@@ -63,15 +74,16 @@ def main():
     parser.add_argument("--eval-points", type=int, default=20, help="exploitability checkpoints")
     parser.add_argument("--out-dir", default="results")
     parser.add_argument("--plot", action="store_true", help="save a convergence plot (needs viz)")
+    parser.add_argument("--seed", type=int, default=None, help="random seed (mccfr only)")
+    parser.add_argument(
+        "--show-strategy",
+        action="store_true",
+        help="print every info set's strategy (default: only for small games)",
+    )
     args = parser.parse_args()
 
-    if args.game not in GAMES:
-        raise SystemExit(f"game '{args.game}' is not implemented yet (planned for M3)")
-    if args.solver not in SOLVERS:
-        raise SystemExit(f"solver '{args.solver}' is not implemented yet (planned for M3)")
-
     game = GAMES[args.game]()
-    solver = SOLVERS[args.solver](game)
+    solver = SOLVERS[args.solver](game, args.seed)
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     name = f"{args.game}_{args.solver}"
@@ -91,8 +103,11 @@ def main():
     strategy = solver.average_strategy()
     actions = {key: solver.actions(key) for key in strategy}
     print(f"\nGame value for player 0: {expected_value(game, strategy, player=0):+.5f}")
-    print("Average strategy (info set = own card | betting history; p = check/fold, b = bet/call):")
-    print_strategy(strategy, actions)
+    if args.show_strategy or len(strategy) <= 30:
+        print(f"Average strategy ({ACTION_LEGEND[args.game]}):")
+        print_strategy(strategy, actions)
+    else:
+        print(f"{len(strategy)} info sets (pass --show-strategy to print them all)")
 
     curve_path = out_dir / f"{name}_convergence.csv"
     with curve_path.open("w", newline="") as f:
