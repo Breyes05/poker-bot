@@ -42,11 +42,11 @@ results and playable in the browser. Each milestone ends with a "done when" chec
 - Reading: Southey et al. 2005 (rules); Lanctot et al. 2009
 
 ### M4 — Push/fold No-Limit Hold'em (1–2 weeks)
-- [ ] Fast 7-card hand evaluator (write your own; benchmark it)
-- [ ] Preflop equity table for the 169 hand classes (compute once, cache to disk)
-- [ ] `games/pushfold.py`: heads-up, configurable stack depth in big blinds
-- [ ] Solve for several stack depths (e.g. 5, 10, 15, 20 BB)
-- [ ] Render the strategy as a 13×13 hand grid
+- [x] Fast 7-card hand evaluator (write your own; benchmark it)
+- [x] Preflop equity table for the 169 hand classes (compute once, cache to disk)
+- [x] `games/pushfold.py`: heads-up, configurable stack depth in big blinds
+- [x] Solve for several stack depths (e.g. 5, 10, 15, 20 BB)
+- [x] Render the strategy as a 13×13 hand grid
 - **Done when:** your charts match published heads-up push/fold Nash charts closely
 - Reading: Cactus Kev evaluator write-up; *The Mathematics of Poker* (jam-or-fold chapters)
 
@@ -81,14 +81,17 @@ Full no-limit Hold'em with abstraction, Deep CFR, 3+ players. Revisit only after
 uv sync
 uv run pytest
 uv run python scripts/train.py --game kuhn --iterations 10000
+uv run --extra viz python scripts/pushfold_charts.py --stacks 5 10 15 20 --plot
 ```
 
 ## Layout
 ```
 src/pokerbot/
   games/     game definitions (state, legal actions, payoffs, info sets)
+  poker/     hand evaluator, 169 hand classes, preflop equity table (cached in data/)
   solvers/   CFR variants
   eval/      exploitability, head-to-head matches
+  viz/       13x13 range charts
 api/         FastAPI service serving trained strategies (M6)
 web/         browser front end (M6)
 scripts/     training and evaluation entry points
@@ -97,4 +100,23 @@ results/     saved strategies and plots (gitignored)
 ```
 
 ## Results
-_TBD_
+
+### Push/fold Hold'em (M4)
+Heads-up, no ante, vanilla CFR for 1,000 iterations per stack depth (about 3 minutes each).
+"Published" is the heads-up Nash table in PokerStrategy's
+[Nash ranges for push-or-fold play](https://www.pokerstrategy.com/strategy/sit-and-go/1779/).
+
+| Stack | Exploitability | SB push (ours / published) | BB call (ours / published) |
+|---|---|---|---|
+| 5 BB  | 0.47 mbb/hand | 71.4% / 74.1% | 61.9% / 68.6% |
+| 10 BB | 0.67 mbb/hand | 58.6% / 56.6% | 37.3% / 38.5% |
+| 15 BB | 0.92 mbb/hand | 45.7% / 45.7% | 28.6% / 28.4% |
+| 20 BB | 1.20 mbb/hand | 40.0% / 40.9% | 21.8% / 21.7% |
+
+At 15 and 20 BB the charts agree to within a few marginal hands. The published 5 BB row
+isn't self-consistent at 5 BB: its push and call ranges are only best responses to each
+other at about 4.3-4.5 BB.
+
+The equity table samples 200k boards. Spot checks against exact enumeration are within
+0.3%, for example AA vs KK 0.8182 against an exact 0.8195. The evaluator scores about
+1.2M seven-card hands per second (numpy, Apple M2 Pro).
