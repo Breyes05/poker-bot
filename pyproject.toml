@@ -12,9 +12,14 @@ dependencies = [
 [project.optional-dependencies]
 deep = ["torch>=2.2"]
 viz = ["matplotlib>=3.8"]
+api = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+]
 
 [dependency-groups]
 dev = [
+    "httpx>=0.27",
     "jupyter>=1.1.1",
     "pytest>=8.0",
     "ruff>=0.5",
@@ -29,6 +34,8 @@ packages = ["src/pokerbot"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]  # so tests can import the top-level `api` package
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient`"]
 
 [tool.ruff]
 line-length = 100

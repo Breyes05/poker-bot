@@ -125,6 +125,10 @@ class LeducHoldem(Game):
         board = RANK_NAMES[rank(state.board)] if state.board is not None else ""
         return f"{own}{board}|{'/'.join(state.rounds)}"
 
+    def contributions(self, state: LeducState) -> list[int]:
+        """Chips each player has put in the pot so far (antes included)."""
+        return self._contributions(state)
+
     @staticmethod
     def _facing_bet(history: str) -> bool:
         # The player to act faces a bet iff the previous action was a raise.

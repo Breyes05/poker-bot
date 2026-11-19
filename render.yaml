@@ -1,0 +1,16 @@
+# Render Blueprint for the API (https://render.com/docs/blueprint-spec).
+# The front end deploys separately on Vercel; see DEPLOY.md.
+services:
+  - type: web
+    name: pokerbot-api
+    runtime: python
+    plan: free
+    buildCommand: pip install ".[api]"
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.7
+      - key: ALLOWED_ORIGINS # your Vercel URL, e.g. https://pokerbot.vercel.app
+        sync: false

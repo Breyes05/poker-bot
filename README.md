@@ -57,11 +57,12 @@ results and playable in the browser. Each milestone ends with a "done when" chec
 - **Done when:** a measurable speedup, and all correctness tests still pass
 
 ### M6 — Playable demo (1–2 weeks)
-- [ ] `api/`: FastAPI service loading saved strategies (no solving at request time)
+- [x] `api/`: FastAPI service loading saved strategies (no solving at request time)
       - endpoints: new hand, take action, bot action, show strategy for current info set
-- [ ] `web/`: small React/TypeScript front end to play Leduc and push/fold vs. the bot
-- [ ] "Show bot's strategy" toggle (action probabilities for the current spot)
-- [ ] Deploy (Render / Fly.io / Vercel); add the link here
+      - plus on-demand push/fold solving for any stack depth (CFR+, cached)
+- [x] `web/`: small React/TypeScript front end to play Leduc and push/fold vs. the bot
+- [x] "Show bot's strategy" toggle (action probabilities for the current spot)
+- [ ] Deploy (Render + Vercel, see `DEPLOY.md`); add the link here
 - **Done when:** a stranger can open the link and play a full hand
 
 ### M7 — Polish (a few days)
@@ -85,6 +86,14 @@ uv run python scripts/benchmark.py
 uv run --extra viz python scripts/pushfold_charts.py --stacks 5 10 15 20 --plot
 ```
 
+Run the demo locally (two terminals):
+```bash
+uv run --extra api uvicorn api.main:app --reload   # API on :8000, docs at /docs
+cd web && npm install && npm run dev               # site on :5173
+```
+`uv run python scripts/export_strategies.py` regenerates the strategies the API serves.
+Deployment steps are in [DEPLOY.md](DEPLOY.md).
+
 ## Layout
 ```
 src/pokerbot/
@@ -93,8 +102,9 @@ src/pokerbot/
   solvers/   CFR variants
   eval/      exploitability, head-to-head matches
   viz/       13x13 range charts
-api/         FastAPI service serving trained strategies (M6)
-web/         browser front end (M6)
+api/         FastAPI service: play hands against the solved strategies, solve push/fold
+             on demand (strategies/ holds the exported JSON)
+web/         React + TypeScript front end (Vite)
 scripts/     training and evaluation entry points
 tests/       unit tests
 results/     saved strategies and plots (gitignored)
