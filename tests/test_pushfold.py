@@ -2,11 +2,11 @@
 
 import pytest
 
-from pokerbot.eval.exploitability import exploitability, to_mbb
+from pokerbot.eval.exploitability import to_mbb
 from pokerbot.games.pushfold import PushFoldHoldem, PushFoldState
 from pokerbot.poker.equity import load_equity_table
 from pokerbot.poker.hand_classes import CLASS_INDEX, range_fraction
-from pokerbot.solvers.cfr import CFRSolver
+from pokerbot.solvers.vector_cfr import VectorCFRSolver
 from pokerbot.viz.charts import chart, text_chart
 
 AA, KK, J7o = CLASS_INDEX["AA"], CLASS_INDEX["KK"], CLASS_INDEX["J7o"]
@@ -19,13 +19,12 @@ def game():
 
 @pytest.fixture(scope="module")
 def solved():
-    """Strategies after a short CFR run at two stack depths."""
+    """Near-exact equilibria (CFR+, 500 iterations) at three stack depths."""
     out = {}
-    for stack in (5, 20):
-        game = PushFoldHoldem(stack)
-        solver = CFRSolver(game)
-        solver.train(40)
-        out[stack] = (game, solver.average_strategy())
+    for stack in (5, 15, 20):
+        solver = VectorCFRSolver(PushFoldHoldem(stack), "cfr+")
+        solver.train(500)
+        out[stack] = (solver, solver.average_strategy())
     return out
 
 
@@ -69,19 +68,29 @@ def test_stack_must_exceed_big_blind():
 # --- Solving -----------------------------------------------------------------------
 
 
-def test_cfr_visits_338_info_sets_and_converges(solved):
-    for game, strategy in solved.values():
+def test_cfr_plus_reaches_equilibrium(solved):
+    for solver, strategy in solved.values():
         assert len(strategy) == 2 * 169  # each class, for each player
-        assert to_mbb(game, exploitability(game, strategy)) < 35
+        assert to_mbb(solver.game, solver.exploitability()) < 0.1
 
 
 def test_premium_hands_always_push_and_call(solved):
-    # Not exactly 1.0 after a short run: the average still includes the uniform
-    # 50/50 strategy from the first iterations.
     for _, strategy in solved.values():
         for hand in ("AA", "KK", "AKs"):
-            assert strategy[f"{hand}|"][1] > 0.95
-            assert strategy[f"{hand}|p"][1] > 0.95
+            assert strategy[f"{hand}|"][1] > 0.999
+            assert strategy[f"{hand}|p"][1] > 0.999
+
+
+def test_matches_published_nash_ranges(solved):
+    # PokerStrategy's heads-up no-ante Nash table: 15 BB push 45.7% / call 28.4%,
+    # 20 BB call 21.7%. (Their 20 BB push, 40.9%, is off by a few marginal hands;
+    # see the README.)
+    def fraction(stack, history):
+        return range_fraction(chart(solved[stack][1], history, 1).ravel())
+
+    assert fraction(15, "") == pytest.approx(0.457, abs=0.003)
+    assert fraction(15, "p") == pytest.approx(0.284, abs=0.003)
+    assert fraction(20, "p") == pytest.approx(0.217, abs=0.003)
 
 
 def test_ranges_tighten_as_stacks_get_deeper(solved):

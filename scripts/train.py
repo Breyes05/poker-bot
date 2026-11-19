@@ -4,6 +4,11 @@ Examples:
     uv run python scripts/train.py --game kuhn --iterations 10000
     uv run --extra viz python scripts/train.py --game kuhn --iterations 100000 --plot
     uv run python scripts/train.py --game leduc --solver mccfr --iterations 1000000 --seed 0
+    uv run python scripts/train.py --game leduc --solver cfr+ --iterations 3000
+
+Solvers: cfr (reference, pure Python), vcfr (same algorithm, vectorized), cfr+
+(vectorized CFR+), mccfr (external sampling). Exploitability is always measured
+with the vectorized best response on a compiled game tree.
 """
 
 import argparse
@@ -12,17 +17,21 @@ import pickle
 import time
 from pathlib import Path
 
-from pokerbot.eval.exploitability import exploitability, to_mbb
+from pokerbot.eval.exploitability import to_mbb
 from pokerbot.eval.value import expected_value
 from pokerbot.games.kuhn import KuhnPoker
 from pokerbot.games.leduc import LeducHoldem
 from pokerbot.solvers.cfr import CFRSolver
 from pokerbot.solvers.mccfr import MCCFRSolver
+from pokerbot.solvers.tree import GameTree
+from pokerbot.solvers.vector_cfr import VectorCFRSolver
 
 GAMES = {"kuhn": KuhnPoker, "leduc": LeducHoldem}
 SOLVERS = {
-    "cfr": lambda game, seed: CFRSolver(game),
-    "mccfr": lambda game, seed: MCCFRSolver(game, seed=seed),
+    "cfr": lambda game, tree, seed: CFRSolver(game),
+    "vcfr": lambda game, tree, seed: VectorCFRSolver(game, "cfr", tree=tree),
+    "cfr+": lambda game, tree, seed: VectorCFRSolver(game, "cfr+", tree=tree),
+    "mccfr": lambda game, tree, seed: MCCFRSolver(game, seed=seed),
 }
 ACTION_LEGEND = {
     "kuhn": "info set = own card | history; p = check/fold, b = bet/call",
@@ -69,7 +78,7 @@ def save_plot(rows: list[dict], path: Path, title: str) -> None:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--game", choices=["kuhn", "leduc"], default="kuhn")
-    parser.add_argument("--solver", choices=["cfr", "mccfr"], default="cfr")
+    parser.add_argument("--solver", choices=list(SOLVERS), default="cfr+")
     parser.add_argument("--iterations", type=int, default=10_000)
     parser.add_argument("--eval-points", type=int, default=20, help="exploitability checkpoints")
     parser.add_argument("--out-dir", default="results")
@@ -83,10 +92,11 @@ def main():
     args = parser.parse_args()
 
     game = GAMES[args.game]()
-    solver = SOLVERS[args.solver](game, args.seed)
+    tree = GameTree(game)  # compiled once; used for fast exploitability (and by vcfr/cfr+)
+    solver = SOLVERS[args.solver](game, tree, args.seed)
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    name = f"{args.game}_{args.solver}"
+    name = f"{args.game}_{args.solver.replace('+', 'plus')}"
 
     rows = []
     train_time = 0.0
@@ -96,7 +106,7 @@ def main():
         solver.train(target - solver.iterations)
         train_time += time.perf_counter() - start
 
-        mbb = to_mbb(game, exploitability(game, solver.average_strategy()))
+        mbb = to_mbb(game, tree.exploitability(tree.strategy_matrix(solver.average_strategy())))
         rows.append({"iteration": target, "exploitability_mbb": mbb, "train_seconds": train_time})
         print(f"{target:>10}  {mbb:>26.3f}  {train_time:>9.2f}s")
 

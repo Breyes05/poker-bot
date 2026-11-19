@@ -51,9 +51,9 @@ results and playable in the browser. Each milestone ends with a "done when" chec
 - Reading: Cactus Kev evaluator write-up; *The Mathematics of Poker* (jam-or-fold chapters)
 
 ### M5 — Performance (a few days)
-- [ ] Profile training (`cProfile` / `py-spy`); write down the hot spots
-- [ ] Vectorize the hot paths with NumPy (e.g. array-backed regret tables)
-- [ ] Benchmark script with before/after numbers recorded in this README
+- [x] Profile training (`cProfile` / `py-spy`); write down the hot spots
+- [x] Vectorize the hot paths with NumPy (e.g. array-backed regret tables)
+- [x] Benchmark script with before/after numbers recorded in this README
 - **Done when:** a measurable speedup, and all correctness tests still pass
 
 ### M6 — Playable demo (1–2 weeks)
@@ -80,7 +80,8 @@ Full no-limit Hold'em with abstraction, Deep CFR, 3+ players. Revisit only after
 ```bash
 uv sync
 uv run pytest
-uv run python scripts/train.py --game kuhn --iterations 10000
+uv run python scripts/train.py --game leduc --solver cfr+ --iterations 3000
+uv run python scripts/benchmark.py
 uv run --extra viz python scripts/pushfold_charts.py --stacks 5 10 15 20 --plot
 ```
 
@@ -102,21 +103,58 @@ results/     saved strategies and plots (gitignored)
 ## Results
 
 ### Push/fold Hold'em (M4)
-Heads-up, no ante, vanilla CFR for 1,000 iterations per stack depth (about 3 minutes each).
+Heads-up, no ante, CFR+ for 2,000 iterations per stack depth (about 9 seconds each).
 "Published" is the heads-up Nash table in PokerStrategy's
 [Nash ranges for push-or-fold play](https://www.pokerstrategy.com/strategy/sit-and-go/1779/).
 
 | Stack | Exploitability | SB push (ours / published) | BB call (ours / published) |
 |---|---|---|---|
-| 5 BB  | 0.47 mbb/hand | 71.4% / 74.1% | 61.9% / 68.6% |
-| 10 BB | 0.67 mbb/hand | 58.6% / 56.6% | 37.3% / 38.5% |
-| 15 BB | 0.92 mbb/hand | 45.7% / 45.7% | 28.6% / 28.4% |
-| 20 BB | 1.20 mbb/hand | 40.0% / 40.9% | 21.8% / 21.7% |
+| 5 BB  | 0.001 mbb/hand | 71.2% / 74.1% | 61.7% / 68.6% |
+| 10 BB | 0.001 mbb/hand | 58.0% / 56.6% | 37.3% / 38.5% |
+| 15 BB | 0.001 mbb/hand | 45.7% / 45.7% | 28.4% / 28.4% |
+| 20 BB | 0.001 mbb/hand | 40.0% / 40.9% | 21.7% / 21.7% |
 
-At 15 and 20 BB the charts agree to within a few marginal hands. The published 5 BB row
-isn't self-consistent at 5 BB: its push and call ranges are only best responses to each
-other at about 4.3-4.5 BB.
+At 15 BB both ranges match exactly, and the 20 BB call range does too. The other
+published rows are a few marginal hands off. Their 5 BB row isn't self-consistent at
+5 BB: its push and call ranges are only best responses to each other at about
+4.3-4.5 BB.
 
 The equity table samples 200k boards. Spot checks against exact enumeration are within
 0.3%, for example AA vs KK 0.8182 against an exact 0.8195. The evaluator scores about
 1.2M seven-card hands per second (numpy, Apple M2 Pro).
+
+### Performance (M5)
+**Profile.** `cProfile` on the reference solver showed no single hot function. Time was
+spread across `Game` API calls: `next_state`, `payoff`, `is_terminal`, and dataclass
+construction. Ten push/fold iterations made 1.4M `next_state` calls rebuilding a tree
+that never changes. The best response had the same problem, plus dict-based memoization.
+
+**Fix.**
+1. `solvers/tree.py` compiles the game tree once into flat NumPy arrays (breadth-first,
+   so each depth level is a contiguous slice).
+2. `solvers/vector_cfr.py` runs CFR as a few vectorized operations per tree level, with
+   regrets and strategy sums stored as `(info sets × actions)` matrices updated by
+   `bincount`. Its results match the reference `CFRSolver` to about 1e-15.
+3. The best response is vectorized the same way. Results match the reference exactly.
+4. CFR+ (regrets floored at 0, alternating updates, linear averaging) for faster
+   convergence.
+
+`uv run python scripts/benchmark.py` (Apple M2 Pro):
+
+| Game | Tree nodes | Reference CFR / iter | Vectorized CFR / iter | Speedup | Reference exploitability | Vectorized exploitability | Speedup |
+|---|---|---|---|---|---|---|---|
+| Kuhn | 55 | 60 µs | 57 µs | 1× | 195 µs | 81 µs | 2× |
+| Leduc | 9,451 | 19.1 ms | 331 µs | **58×** | 60.7 ms | 601 µs | **101×** |
+| Push/fold 10 BB | 142,806 | 187.5 ms | 2.8 ms | **66×** | 553 ms | 4.3 ms | **128×** |
+
+Time to reach a target exploitability:
+
+| Game | Target | Reference CFR | Vectorized CFR | Vectorized CFR+ | Overall |
+|---|---|---|---|---|---|
+| Kuhn | 1 mbb | 52,990 it · 3.2 s | 52,990 it · 3.1 s | 79 it · 8 ms | **399×** |
+| Leduc | 20 mbb | 3,345 it · 64 s | 3,345 it · 1.1 s | 79 it · 44 ms | **1,451×** |
+| Push/fold 10 BB | 1 mbb | 731 it · 2.3 min | 731 it · 2.1 s | 39 it · 172 ms | **796×** |
+
+The reference CFR times are estimated as iterations × time per iteration, since it
+computes identical iterates to vectorized CFR. Kuhn's tree (55 nodes) is too small for
+vectorization to pay off; the gains grow with tree size.

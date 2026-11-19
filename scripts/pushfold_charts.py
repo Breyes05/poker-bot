@@ -14,11 +14,10 @@ import json
 import time
 from pathlib import Path
 
-from pokerbot.eval.exploitability import exploitability, to_mbb
-from pokerbot.eval.value import expected_value
+from pokerbot.eval.exploitability import to_mbb
 from pokerbot.games.pushfold import PushFoldHoldem
 from pokerbot.poker.hand_classes import CLASS_NAMES, range_fraction
-from pokerbot.solvers.cfr import CFRSolver
+from pokerbot.solvers.vector_cfr import VectorCFRSolver
 from pokerbot.viz.charts import chart, plot_charts, text_chart
 
 
@@ -29,7 +28,8 @@ def fmt_stack(stack: float) -> str:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--stacks", type=float, nargs="+", default=[5, 10, 15, 20])
-    parser.add_argument("--iterations", type=int, default=500)
+    parser.add_argument("--iterations", type=int, default=2000)
+    parser.add_argument("--variant", choices=["cfr+", "cfr"], default="cfr+")
     parser.add_argument("--out-dir", type=Path, default=Path("results"))
     parser.add_argument("--plot", action="store_true", help="save PNG charts (needs viz)")
     args = parser.parse_args()
@@ -38,16 +38,19 @@ def main():
     for stack in args.stacks:
         name = f"pushfold_{fmt_stack(stack)}bb"
         game = PushFoldHoldem(stack)
-        solver = CFRSolver(game)
         start = time.perf_counter()
+        solver = VectorCFRSolver(game, args.variant)
         solver.train(args.iterations)
         seconds = time.perf_counter() - start
         strategy = solver.average_strategy()
-        mbb = to_mbb(game, exploitability(game, strategy))
+        mbb = to_mbb(game, solver.exploitability())
         push, call = chart(strategy, "", 1), chart(strategy, "p", 1)
-        sb_value = expected_value(game, strategy, player=0)
+        sb_value = solver.tree.expected_value(solver.average_strategy_matrix())
 
-        print(f"=== {fmt_stack(stack)} BB  ({args.iterations} iterations, {seconds:.1f}s) ===")
+        print(
+            f"=== {fmt_stack(stack)} BB  ({args.variant}, {args.iterations} iterations, "
+            f"{seconds:.1f}s) ==="
+        )
         print(f"exploitability {mbb:.3f} mbb/hand, small blind EV {sb_value:+.4f} BB")
         print(f"small blind pushes {range_fraction(push.ravel()):.1%} of hands")
         print(text_chart(push))
@@ -59,6 +62,7 @@ def main():
             json.dump(
                 {
                     "stack_bb": stack,
+                    "solver": args.variant,
                     "iterations": args.iterations,
                     "exploitability_mbb": mbb,
                     "push": dict(zip(CLASS_NAMES, push.ravel().round(4).tolist())),
